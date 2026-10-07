@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gourav Project Pvt Ltd - Employee Portal</title>
+  
+  <!-- Tailwind CSS & jsQR CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    /* Prevent iOS/Android zoom on input focus */
+    input, select, textarea { font-size: 16px !important; }
+    @media (min-width: 640px) { input, select, textarea { font-size: 14px !important; } }
+    
+    /* Animated Laser Line for QR Scanner */
+    @keyframes scanline {
+      0% { top: 6%; opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { top: 92%; opacity: 0.8; }
+    }
+    #scanner-overlay::before {
+      content: "";
+      position: absolute;
+      width: 190px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #2563eb, #38bdf8, transparent);
+      box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.75);
+      border-radius: 9999px;
+      animation: scanline 2s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+
+  <script>
+    // =========================================================================
+    // STEP: APNA GOOGLE APPS SCRIPT WEB APP URL YAHAN PASTE KAREIN
+    // =========================================================================
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzajXzRwyQ2sL6WCjvKVa9v5pBOPKDwxH-H9nMmWGRNRbfEeU4NxubGK3W34eCwsGWYAw/exec";
+  </script>
+
+  <!-- Global Header -->
+  <header id="global-header" class="hidden bg-slate-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow">GP</div>
+        <div>
+          <h1 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Gourav Project Pvt Ltd</h1>
+          <p id="nav-user-name" class="text-sm font-bold truncate max-w-[170px] text-white">Employee</p>
+        </div>
+      </div>
+      <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-red-600 text-slate-200 hover:text-white px-3 py-1.5 rounded-md font-medium transition border border-slate-700">Logout</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 flex flex-col justify-center">
+
+    <!-- 1. LOGIN SECTION -->
+    <section id="section-login" class="w-full">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 md:p-8">
+        <div class="text-center mb-6">
+          <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 items-center justify-center shadow-lg text-white text-xl font-extrabold mb-3">GP</div>
+          <h2 class="text-xl font-bold tracking-tight text-slate-900 uppercase">Gourav Project Pvt Ltd</h2>
+          <p class="text-xs text-slate-500 mt-1 uppercase font-semibold">Employee Self-Service Portal</p>
+        </div>
+
+        <div id="login-error" class="hidden mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-700 text-xs font-medium"></div>
+
+        <form onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Login ID</label>
+            <input type="text" id="login-id" required autocomplete="username" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Enter Login ID">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+            <input type="password" id="login-password" required autocomplete="current-password" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Your Google / Gmail ID</label>
+            <input type="email" id="login-gmail" required class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@gmail.com">
+          </div>
+          <button type="submit" id="btn-login" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow-md transition flex items-center justify-center">Sign In</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 2. DASHBOARD -->
+    <section id="section-dashboard" class="hidden w-full space-y-4">
+      <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white rounded-2xl p-5 shadow-lg border border-slate-700">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30 mb-2" id="dash-emp-id">EMP ID</span>
+            <h2 id="dash-emp-name" class="text-lg font-bold text-white tracking-tight">Employee Name</h2>
+            <p id="dash-emp-desig" class="text-xs text-slate-300 font-medium">Designation</p>
+          </div>
+          <div class="text-right">
+            <span id="dash-emp-dept" class="text-xs font-semibold text-slate-300 block">Department</span>
+            <span id="dash-emp-loc" class="inline-flex items-center text-[11px] text-slate-400 mt-1">📍 Location</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Modules -->
+      <div class="grid grid-cols-2 gap-3.5">
+        <!-- Mark Attendance Button -->
+        <button onclick="openAttendance()" class="col-span-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white p-4 rounded-2xl shadow-md text-left transition transform active:scale-[0.99] flex items-center justify-between">
+          <div class="flex items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">📍</div>
+            <div>
+              <h3 class="font-bold text-base tracking-wide">Mark Attendance</h3>
+              <p class="text-xs text-blue-100">Live Camera Stream + Live GPS</p>
+            </div>
+          </div>
+          <span class="text-white font-bold text-lg">›</span>
+        </button>
+
+        <!-- Advance Payment Button -->
+        <button onclick="openAdvanceForm()" class="col-span-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white p-4 rounded-2xl shadow-md text-left transition transform active:scale-[0.99] flex items-center justify-between">
+          <div class="flex items-center space-x-3.5">
+            <div class="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">💰</div>
+            <div>
+              <h3 class="font-bold text-base tracking-wide">Advance Payment Request</h3>
+              <p class="text-xs text-emerald-100">Amount, Purpose, Date & Deduction</p>
+            </div>
+          </div>
+          <span class="text-white font-bold text-lg">›</span>
+        </button>
+
+        <!-- Leave Application -->
+        <button onclick="openLeaveForm()" class="bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm text-left transition flex flex-col justify-between">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-xl mb-3">📝</div>
+          <div><h3 class="font-bold text-sm text-slate-800">Leave Application</h3><p class="text-[11px] text-slate-500 mt-0.5">EL, SL, CL</p></div>
+        </button>
+
+        <!-- Complaint -->
+        <button onclick="openComplaintForm()" class="bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm text-left transition flex flex-col justify-between">
+          <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-xl mb-3">⚠️</div>
+          <div><h3 class="font-bold text-sm text-slate-800">Complaint / Issue</h3><p class="text-[11px] text-slate-500 mt-0.5">Workplace & IT</p></div>
+        </button>
+
+        <!-- General Request -->
+        <button onclick="openGeneralRequest()" class="col-span-2 bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm text-left transition flex items-center justify-between">
+          <div class="flex items-center space-x-3.5">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xl">📄</div>
+            <div><h3 class="font-bold text-sm text-slate-800">General Request</h3><p class="text-xs text-slate-500">WFH, Shift, ID Card, Documents</p></div>
+          </div>
+          <span class="text-slate-400 font-bold text-lg">›</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. LIVE CAMERA ATTENDANCE SECTION -->
+    <section id="section-attendance" class="hidden w-full space-y-4">
+      <div class="flex items-center justify-between">
+        <button onclick="cancelAttendance()" class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300">← Back</button>
+        <span class="text-xs font-bold uppercase text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md">Live Verification</span>
+      </div>
+
+      <div id="scanner-view-container" class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden p-4 space-y-3">
+        <div class="text-center">
+          <h2 class="font-bold text-slate-800 text-base">Live QR Scanner</h2>
+          <p class="text-xs text-slate-500">Camera ko Office QR Code ke samne rakhein</p>
+        </div>
+
+        <!-- Real-Time Camera Stream Box -->
+        <div class="relative w-full aspect-square bg-black rounded-xl overflow-hidden flex items-center justify-center">
+          <video id="camera-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+          
+          <!-- Scanner Target Frame -->
+          <div id="scanner-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="w-48 h-48 border-2 border-blue-400 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              <div class="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+              <div class="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+              <div class="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+              <div class="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+            </div>
+          </div>
+
+          <div id="scanner-status-pill" class="absolute bottom-3 bg-black/80 backdrop-blur text-white text-[11px] px-3.5 py-1 rounded-full flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="scanner-status-text">Starting Camera Stream...</span>
+          </div>
+        </div>
+
+        <div id="scanner-error" class="hidden p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-700 text-xs font-medium"></div>
+
+        <div class="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t">
+          <span>GPS Sensor Active</span>
+          <button onclick="startLiveCamera()" class="text-blue-600 font-semibold hover:underline">Restart Camera</button>
+        </div>
+      </div>
+
+      <!-- Attendance Success Card -->
+      <div id="attendance-success-card" class="hidden bg-white rounded-2xl shadow-xl border border-emerald-200 p-6 text-center space-y-4">
+        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-extrabold shadow-inner">✓</div>
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">Attendance Marked Successfully</h2>
+          <p class="text-xs text-emerald-600 font-semibold mt-0.5">Verified & Saved in Google Sheet</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-left space-y-2">
+          <div class="flex justify-between"><span class="text-slate-500 font-medium">Employee:</span><span id="succ-emp-name" class="font-bold text-slate-800">-</span></div>
+          <div class="flex justify-between"><span class="text-slate-500 font-medium">Google Account:</span><span id="succ-emp-gmail" class="font-mono text-blue-700">-</span></div>
+          <div class="flex justify-between"><span class="text-slate-500 font-medium">Location:</span><span id="succ-emp-loc" class="font-semibold text-slate-800">-</span></div>
+          <div class="flex justify-between"><span class="text-slate-500 font-medium">Time:</span><span id="succ-timestamp" class="font-mono text-slate-800">-</span></div>
+          <div class="flex justify-between"><span class="text-slate-500 font-medium">Distance from QR:</span><span id="succ-distance" class="font-semibold text-emerald-700">-</span></div>
+        </div>
+        <p class="text-[11px] text-slate-400">Returning to dashboard automatically...</p>
+      </div>
+    </section>
+
+    <!-- 4. ADVANCE PAYMENT FORM -->
+    <section id="section-advance-pay" class="hidden w-full space-y-4">
+      <div class="flex items-center justify-between">
+        <button onclick="showDashboard()" class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-lg bg-slate-200">← Back</button>
+        <span class="text-xs font-bold text-slate-700 uppercase">ADVANCE PAYMENT REQUEST</span>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5 md:p-6">
+        <div id="advance-msg" class="hidden mb-4 p-3 rounded text-xs font-medium"></div>
+        <form onsubmit="event.preventDefault(); submitAdvancePaymentForm();" class="space-y-4">
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Amount (₹) *</label><input type="number" id="adv-amount" min="1" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl outline-none" placeholder="e.g. 5000"></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Purpose *</label><textarea id="adv-purpose" rows="2" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl outline-none" placeholder="Reason for advance..."></textarea></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Required on *</label><input type="date" id="adv-required-on" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl outline-none"></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Expected Deduction *</label><input type="text" id="adv-deduction" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl outline-none" placeholder="e.g. From Next Month Salary"></div>
+          <button type="submit" id="btn-advance-submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm shadow">Submit Advance Request</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 5. LEAVE APPLICATION -->
+    <section id="section-leave" class="hidden w-full space-y-4">
+      <div class="flex items-center justify-between">
+        <button onclick="showDashboard()" class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-lg bg-slate-200">← Back</button>
+        <span class="text-xs font-bold text-slate-700">LEAVE APPLICATION</span>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+        <div id="leave-msg" class="hidden mb-4 p-3 rounded text-xs font-medium"></div>
+        <form onsubmit="event.preventDefault(); submitLeave();" class="space-y-4">
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Leave Type *</label><select id="leave-type" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"><option value="">Select</option><option value="EL">EL</option><option value="SL">SL</option><option value="CL">CL</option></select></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block text-xs font-semibold text-slate-700 mb-1">From *</label><input type="date" id="leave-from" required onchange="calculateLeaveDays()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+            <div><label class="block text-xs font-semibold text-slate-700 mb-1">To *</label><input type="date" id="leave-to" required onchange="calculateLeaveDays()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+          </div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Days *</label><input type="number" id="leave-days" min="0.5" step="0.5" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Reason *</label><textarea id="leave-reason" rows="2" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></textarea></div>
+          <button type="submit" id="btn-leave-submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow">Submit Leave</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 6. COMPLAINT -->
+    <section id="section-complaint" class="hidden w-full space-y-4">
+      <div class="flex items-center justify-between">
+        <button onclick="showDashboard()" class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-lg bg-slate-200">← Back</button>
+        <span class="text-xs font-bold text-slate-700">COMPLAINT / ISSUE</span>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+        <div id="complaint-msg" class="hidden mb-4 p-3 rounded text-xs font-medium"></div>
+        <form onsubmit="event.preventDefault(); submitComplaint();" class="space-y-4">
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Issue Type *</label><select id="complaint-type" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"><option value="Workplace">Workplace</option><option value="System IT">System IT</option><option value="Safety">Safety</option><option value="Other">Other</option></select></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Description *</label><textarea id="complaint-desc" rows="3" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></textarea></div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Expected Resolution</label><textarea id="complaint-resolution" rows="2" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></textarea></div>
+          <button type="submit" id="btn-complaint-submit" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-sm shadow">Submit Issue</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 7. GENERAL REQUEST -->
+    <section id="section-request" class="hidden w-full space-y-4">
+      <div class="flex items-center justify-between">
+        <button onclick="showDashboard()" class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-lg bg-slate-200">← Back</button>
+        <span class="text-xs font-bold text-slate-700">GENERAL REQUEST</span>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+        <div id="request-msg" class="hidden mb-4 p-3 rounded text-xs font-medium"></div>
+        <form onsubmit="event.preventDefault(); submitGeneralRequest();" class="space-y-4">
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Request Type *</label><select id="req-type" required onchange="toggleOther()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"><option value="Work From Home">Work From Home</option><option value="Document">Document</option><option value="Shift Change">Shift Change</option><option value="ID Card">ID Card</option><option value="Other">Other</option></select></div>
+          <div id="req-other-container" class="hidden"><label class="block text-xs font-semibold text-slate-700 mb-1">Specify Other *</label><input type="text" id="req-other-type" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block text-xs font-semibold text-slate-700 mb-1">From</label><input type="date" id="req-from" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+            <div><label class="block text-xs font-semibold text-slate-700 mb-1">To</label><input type="date" id="req-to" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></div>
+          </div>
+          <div><label class="block text-xs font-semibold text-slate-700 mb-1">Details *</label><textarea id="req-details" rows="3" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl"></textarea></div>
+          <button type="submit" id="btn-request-submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow">Submit Request</button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Loader -->
+  <div id="global-loader" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white p-5 rounded-2xl shadow-xl flex items-center space-x-3">
+      <div class="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <span id="loader-text" class="text-xs font-semibold text-slate-700">Connecting to Google Sheet...</span>
+    </div>
+  </div>
+
+  <script>
+    // --- Application State ---
+    let currentUser = null;
+    let videoStream = null;
+    let qrAnimationId = null;
+    let isScanning = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkPersistedSession();
+    });
+
+    // Clean CORS Fetch to Google Apps Script
+    async function apiRequest(payload) {
+      if (BACKEND_URL.includes("https://script.google.com/macros/s/AKfycbzajXzRwyQ2sL6WCjvKVa9v5pBOPKDwxH-H9nMmWGRNRbfEeU4NxubGK3W34eCwsGWYAw/exec")) {
+        alert("https://script.google.com/macros/s/AKfycbzajXzRwyQ2sL6WCjvKVa9v5pBOPKDwxH-H9nMmWGRNRbfEeU4NxubGK3W34eCwsGWYAw/exec");
+        throw new Error("Missing BACKEND_URL");
+      }
+      
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      return await response.json();
+    }
+
+    function checkPersistedSession() {
+      try {
+        const saved = sessionStorage.getItem('gp_net_session');
+        if (saved) {
+          currentUser = JSON.parse(saved);
+          if (currentUser && currentUser.loginId) {
+            showDashboard();
+            return;
+          }
+        }
+      } catch (e) {
+        sessionStorage.removeItem('gp_net_session');
+      }
+      switchSection('section-login');
+    }
+
+    function switchSection(id) {
+      ['section-login', 'section-dashboard', 'section-attendance', 'section-advance-pay', 'section-leave', 'section-complaint', 'section-request']
+        .forEach(s => document.getElementById(s).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+
+      const header = document.getElementById('global-header');
+      if (id === 'section-login') {
+        header.classList.add('hidden');
+      } else {
+        header.classList.remove('hidden');
+        if (currentUser) document.getElementById('nav-user-name').innerText = currentUser.employeeName;
+      }
+      window.scrollTo(0, 0);
+    }
+
+    function showLoading(msg) {
+      document.getElementById('loader-text').innerText = msg;
+      document.getElementById('global-loader').classList.remove('hidden');
+    }
+    function hideLoading() {
+      document.getElementById('global-loader').classList.add('hidden');
+    }
+    function displayAlert(elId, msg, isError = true) {
+      const el = document.getElementById(elId);
+      el.innerText = msg;
+      el.className = isError ? 'mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-700 text-xs font-medium' : 'mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded text-emerald-700 text-xs font-medium';
+      el.classList.remove('hidden');
+    }
+    function hideAlert(elId) {
+      document.getElementById(elId).classList.add('hidden');
+    }
+
+    // 1. LOGIN
+    async function handleLogin() {
+      hideAlert('login-error');
+      const loginId = document.getElementById('login-id').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const gmailId = document.getElementById('login-gmail').value.trim();
+
+      if (!loginId || !password || !gmailId) {
+        displayAlert('login-error', 'Please fill in all fields.');
+        return;
+      }
+
+      showLoading('Verifying credentials...');
+      try {
+        const res = await apiRequest({ action: "login", loginId, password });
+        hideLoading();
+        if (res.success) {
+          currentUser = res.user;
+          currentUser.gmailId = gmailId;
+          sessionStorage.setItem('gp_net_session', JSON.stringify(currentUser));
+          showDashboard();
+        } else {
+          displayAlert('login-error', res.message || 'Invalid Login credentials.');
+        }
+      } catch (err) {
+        hideLoading();
+        displayAlert('login-error', 'Network error. Verify Google Web App URL.');
+      }
+    }
+
+    function logout() {
+      stopCamera();
+      currentUser = null;
+      sessionStorage.removeItem('gp_net_session');
+      switchSection('section-login');
+    }
+
+    function showDashboard() {
+      stopCamera();
+      if (!currentUser) return switchSection('section-login');
+      document.getElementById('dash-emp-id').innerText = currentUser.employeeId;
+      document.getElementById('dash-emp-name').innerText = currentUser.employeeName;
+      document.getElementById('dash-emp-desig').innerText = currentUser.designation;
+      document.getElementById('dash-emp-dept').innerText = currentUser.department;
+      document.getElementById('dash-emp-loc').innerText = "📍 " + currentUser.location;
+      switchSection('section-dashboard');
+    }
+
+    // 2. LIVE CAMERA SCANNING & GPS (Direct on Netlify, No Iframe Block)
+    function openAttendance() {
+      if (!currentUser) return showDashboard();
+      hideAlert('scanner-error');
+      document.getElementById('scanner-view-container').classList.remove('hidden');
+      document.getElementById('attendance-success-card').classList.add('hidden');
+      switchSection('section-attendance');
+      startLiveCamera();
+    }
+
+    function cancelAttendance() {
+      stopCamera();
+      showDashboard();
+    }
+
+    async function startLiveCamera() {
+      stopCamera();
+      hideAlert('scanner-error');
+      const status = document.getElementById('scanner-status-text');
+      status.innerText = "Requesting live camera...";
+
+      try {
+        // Direct browser camera access (Netlify is HTTPS, so prompt will appear smoothly)
+        const constraints = {
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoStream = stream;
+        const video = document.getElementById('camera-video');
+        video.srcObject = stream;
+        await video.play();
+
+        isScanning = true;
+        status.innerText = "Camera Active: Scanning for QR...";
+        qrAnimationId = requestAnimationFrame(scanLoop);
+      } catch (err) {
+        console.error("Camera error:", err);
+        status.innerText = "Camera Denied";
+        displayAlert('scanner-error', "Camera permission denied or camera not found: " + err.message);
+      }
+    }
+
+    function stopCamera() {
+      isScanning = false;
+      if (qrAnimationId) cancelAnimationFrame(qrAnimationId);
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      const video = document.getElementById('camera-video');
+      if (video) video.srcObject = null;
+    }
+
+    // Dynamic Canvas extraction & jsQR scanning loop
+    function scanLoop() {
+      if (!isScanning) return;
+      const video = document.getElementById('camera-video');
+
+      if (video && video.readyState >= video.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+        if (code && code.data && code.data.trim() !== '') {
+          // QR detected! Stop camera immediately
+          stopCamera();
+          processDetectedQR(code.data.trim());
+          return;
+        }
+      }
+      if (isScanning) qrAnimationId = requestAnimationFrame(scanLoop);
+    }
+
+    // GPS Acquisition with High Accuracy
+    function processDetectedQR(qrData) {
+      showLoading("QR Detected! Acquiring high-accuracy GPS...");
+
+      if (!navigator.geolocation) {
+        hideLoading();
+        displayAlert('scanner-error', 'GPS Geolocation not supported on this device.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          showLoading("Verifying Location Radius & Saving Attendance...");
+          try {
+            const res = await apiRequest({
+              action: "markAttendance",
+              loginId: currentUser.loginId,
+              gmailId: currentUser.gmailId,
+              qrCodeData: qrData,
+              liveLatitude: position.coords.latitude,
+              liveLongitude: position.coords.longitude,
+              gpsAccuracy: position.coords.accuracy
+            });
+
+            hideLoading();
+            if (res.success) {
+              document.getElementById('scanner-view-container').classList.add('hidden');
+              document.getElementById('succ-emp-name').innerText = res.employeeName;
+              document.getElementById('succ-emp-gmail').innerText = currentUser.gmailId;
+              document.getElementById('succ-emp-loc').innerText = res.location;
+              document.getElementById('succ-timestamp').innerText = res.timestamp;
+              document.getElementById('succ-distance').innerText = res.distance + " meters";
+              document.getElementById('attendance-success-card').classList.remove('hidden');
+
+              setTimeout(() => showDashboard(), 2500);
+            } else {
+              displayAlert('scanner-error', res.message);
+            }
+          } catch (e) {
+            hideLoading();
+            displayAlert('scanner-error', 'Connection error saving attendance.');
+          }
+        },
+        (geoErr) => {
+          hideLoading();
+          let msg = "Could not get GPS Location.";
+          if (geoErr.code === 1) msg = "Location Permission Denied. Please enable Location in browser.";
+          else if (geoErr.code === 2) msg = "GPS unavailable. Move to open area.";
+          else if (geoErr.code === 3) msg = "GPS timed out. Please retry.";
+          displayAlert('scanner-error', msg);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
+    // 3. ADVANCE PAYMENT REQUEST
+    function openAdvanceForm() {
+      if (!currentUser) return showDashboard();
+      hideAlert('advance-msg');
+      document.getElementById('adv-amount').value = '';
+      document.getElementById('adv-purpose').value = '';
+      document.getElementById('adv-required-on').value = '';
+      document.getElementById('adv-deduction').value = '';
+      switchSection('section-advance-pay');
+    }
+    async function submitAdvancePaymentForm() {
+      hideAlert('advance-msg');
+      const amount = document.getElementById('adv-amount').value.trim();
+      const purpose = document.getElementById('adv-purpose').value.trim();
+      const requiredOn = document.getElementById('adv-required-on').value;
+      const deduction = document.getElementById('adv-deduction').value.trim();
+
+      if (!amount || !purpose || !requiredOn || !deduction) {
+        displayAlert('advance-msg', 'Please fill all Advance Payment fields.');
+        return;
+      }
+
+      showLoading("Submitting Advance Request...");
+      try {
+        const res = await apiRequest({
+          action: "submitAdvancePayment",
+          loginId: currentUser.loginId,
+          amount, purpose, requiredOn, expectedDeduction: deduction
+        });
+        hideLoading();
+        displayAlert('advance-msg', res.message, !res.success);
+        if (res.success) setTimeout(() => showDashboard(), 1800);
+      } catch (e) {
+        hideLoading();
+        displayAlert('advance-msg', 'Error connecting to Google Sheets.');
+      }
+    }
+
+    // 4. LEAVE APPLICATION
+    function openLeaveForm() {
+      if (!currentUser) return showDashboard();
+      hideAlert('leave-msg');
+      switchSection('section-leave');
+    }
+    function calculateLeaveDays() {
+      const from = document.getElementById('leave-from').value;
+      const to = document.getElementById('leave-to').value;
+      if (from && to) {
+        const diff = Math.ceil(Math.abs(new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)) + 1;
+        document.getElementById('leave-days').value = diff > 0 ? diff : '';
+      }
+    }
+    async function submitLeave() {
+      hideAlert('leave-msg');
+      const leaveType = document.getElementById('leave-type').value;
+      const fromDate = document.getElementById('leave-from').value;
+      const toDate = document.getElementById('leave-to').value;
+      const noOfDays = document.getElementById('leave-days').value;
+      const reason = document.getElementById('leave-reason').value.trim();
+
+      if (!leaveType || !fromDate || !toDate || !noOfDays || !reason) {
+        displayAlert('leave-msg', 'Please fill all required fields.');
+        return;
+      }
+
+      showLoading("Submitting Leave Application...");
+      try {
+        const res = await apiRequest({
+          action: "submitLeave",
+          loginId: currentUser.loginId,
+          leaveType, fromDate, toDate, noOfDays, reason
+        });
+        hideLoading();
+        displayAlert('leave-msg', res.message, !res.success);
+        if (res.success) setTimeout(() => showDashboard(), 1800);
+      } catch (e) {
+        hideLoading();
+        displayAlert('leave-msg', 'Network error.');
+      }
+    }
+
+    // 5. COMPLAINT
+    function openComplaintForm() {
+      if (!currentUser) return showDashboard();
+      hideAlert('complaint-msg');
+      switchSection('section-complaint');
+    }
+    async function submitComplaint() {
+      hideAlert('complaint-msg');
+      const issueType = document.getElementById('complaint-type').value;
+      const description = document.getElementById('complaint-desc').value.trim();
+      const expectedResolution = document.getElementById('complaint-resolution').value.trim();
+
+      if (!issueType || !description) {
+        displayAlert('complaint-msg', 'Please fill in required fields.');
+        return;
+      }
+
+      showLoading("Submitting Issue...");
+      try {
+        const res = await apiRequest({
+          action: "submitComplaint",
+          loginId: currentUser.loginId,
+          issueType, description, expectedResolution
+        });
+        hideLoading();
+        displayAlert('complaint-msg', res.message, !res.success);
+        if (res.success) setTimeout(() => showDashboard(), 1800);
+      } catch (e) {
+        hideLoading();
+        displayAlert('complaint-msg', 'Network error.');
+      }
+    }
+
+    // 6. GENERAL REQUEST
+    function openGeneralRequest() {
+      if (!currentUser) return showDashboard();
+      hideAlert('request-msg');
+      toggleOther();
+      switchSection('section-request');
+    }
+    function toggleOther() {
+      const isOther = document.getElementById('req-type').value === 'Other';
+      document.getElementById('req-other-container').classList.toggle('hidden', !isOther);
+    }
+    async function submitGeneralRequest() {
+      hideAlert('request-msg');
+      const reqType = document.getElementById('req-type').value;
+      const otherType = document.getElementById('req-other-type').value.trim();
+      const requiredFrom = document.getElementById('req-from').value;
+      const toDate = document.getElementById('req-to').value;
+      const details = document.getElementById('req-details').value.trim();
+
+      if (!reqType || !details) {
+        displayAlert('request-msg', 'Please fill required fields.');
+        return;
+      }
+
+      showLoading("Submitting Request...");
+      try {
+        const res = await apiRequest({
+          action: "submitGeneralRequest",
+          loginId: currentUser.loginId,
+          category: reqType === 'Other' ? ("Other: " + otherType) : reqType,
+          requiredFrom, toDate, details
+        });
+        hideLoading();
+        displayAlert('request-msg', res.message, !res.success);
+        if (res.success) setTimeout(() => showDashboard(), 1800);
+      } catch (e) {
+        hideLoading();
+        displayAlert('request-msg', 'Network error.');
+      }
+    }
+  </script>
+</body>
+</html>
